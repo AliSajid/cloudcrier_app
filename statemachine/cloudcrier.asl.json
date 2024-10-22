@@ -1,0 +1,70 @@
+{
+  "Comment": "StateMachine for CloudCrier Application",
+  "StartAt": "QueuingState",
+  "States": {
+    "QueuingState": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "Parameters": {
+        "FunctionName": "${QueuingFunctionArn}",
+        "Payload": {
+          "event.$": "$"
+        }
+      },
+      "Next": "PollSQS"
+    },
+    "PollSQS": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::sqs:receiveMessage",
+      "Parameters": {
+        "QueueUrl": "${WeatherQueueUrl}",
+        "MaxNumberOfMessages": 1,
+        "WaitTimeSeconds": 20
+      },
+      "Next": "CheckService"
+    },
+    "CheckService": {
+      "Type": "Choice",
+      "Choices": [
+        {
+          "Variable": "$.Messages[0].Body.service",
+          "StringEquals": "openweather",
+          "Next": "InvokeOpenWeatherAPI"
+        },
+        {
+          "Variable": "$.Messages[0].Body.service",
+          "StringEquals": "nws",
+          "Next": "InvokeNWSAPI"
+        }
+      ],
+      "Default": "UnknownService"
+    },
+    "InvokeOpenWeatherAPI": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "Parameters": {
+        "FunctionName": "${OpenWeatherApiFunctionArn}",
+        "Payload": {
+          "message.$": "$.Messages[0].Body"
+        }
+      },
+      "End": true
+    },
+    "InvokeNWSAPI": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "Parameters": {
+        "FunctionName": "${NWSApiFunctionArn}",
+        "Payload": {
+          "message.$": "$.Messages[0].Body"
+        }
+      },
+      "End": true
+    },
+    "UnknownService": {
+      "Type": "Fail",
+      "Error": "UnknownServiceError",
+      "Cause": "The SQS message contains an unknown service."
+    }
+  }
+}
