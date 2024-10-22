@@ -1,11 +1,7 @@
 [tool.poetry]
 name = "cloudcrier-app"
 version = "0.1.0"
-description = """
-  An application to periodically access the weather
-  APIs and get the prediction and
-  current weather data.
-"""
+description = "An application to periodically access the weather APIs and get the prediction and current weather data."
 authors = ["Ali Sajid Imami <395482+AliSajid@users.noreply.github.com>"]
 license = "MIT"
 readme = "README.md"
