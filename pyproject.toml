@@ -5,7 +5,11 @@ description = "An application to periodically access the weather APIs and get th
 authors = ["Ali Sajid Imami <395482+AliSajid@users.noreply.github.com>"]
 license = "MIT"
 readme = "README.md"
-package-mode = false
+packages = [
+  { include = "check_nws_api", from = "cloudcrier-app" },
+  { include = "check_openweather_api", from = "cloudcrier-app" },
+  { include = "queue_actions", from = "cloudcrier-app" },
+]
 
 [tool.poetry.dependencies]
 python = "^3.12"
@@ -14,7 +18,7 @@ requests = "^2.32.3"
 [tool.poetry.group.dev.dependencies]
 boto3 = "^1.35.45"
 aws-sam-cli-local = "^1.70.0"
-coverage = {extras = ["toml"], version = "^7.6.4"}
+coverage = { extras = ["toml"], version = "^7.6.4" }
 aws-sam-cli = "^1.126.0"
 black = "^24.10.0"
 flake8 = "^7.1.1"
@@ -42,25 +46,20 @@ skip = "__init__.py"
 
 ##### black configuration https://black.readthedocs.io/en/stable/usage_and_configuration/the_basics.html#configuration-via-a-file
 [tool.black]
-line-length    = 88
-target_version = ['py39']
+line-length = 88
 
 
 ##### pytest configuration: http://doc.pytest.org/en/latest/customize.html
 [tool.pytest.ini_options]
 minversion = "6.0"
-python_files = [ "test_*.py" ]
-norecursedirs = [
-  ".git",
-  ".pytest_cache",
-  ".aws-sam"
-]
+python_files = ["test_*.py"]
+norecursedirs = [".git", ".pytest_cache", ".aws-sam"]
 filterwarnings = [
   "error::UserWarning",
   "error::DeprecationWarning",
-  "error::PendingDeprecationWarning"
+  "error::PendingDeprecationWarning",
 ]
-addopts    = """
+addopts = """
   --color=yes
   -p no:cacheprovider
   --verbose 
