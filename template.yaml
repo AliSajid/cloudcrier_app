@@ -80,7 +80,7 @@ Resources:
   QueuingFunction:
     Type: AWS::Serverless::Function
     Properties:
-      CodeUri: functions/queue_actions/
+      CodeUri: cloudcrier-app/queue_actions/
       Environment:
         Variables:
           QUEUE_NAME: !GetAtt WeatherQueue.QueueName
@@ -88,16 +88,12 @@ Resources:
   NWSApiFunction:
     Type: AWS::Serverless::Function
     Properties:
-      CodeUri: functions/check_nws_api/
-      Architectures:
-        - arm64
+      CodeUri: cloudcrier-app/check_nws_api/
 
   OpenWeatherApiFunction:
     Type: AWS::Serverless::Function
     Properties:
-      CodeUri: functions/check_openweather_api/
-      Architectures:
-        - arm64
+      CodeUri: cloudcrier-app/check_openweather_api/
 
   CityInputTable:
     Type: AWS::Serverless::SimpleTable
