@@ -1,0 +1,21 @@
+version: 2
+updates:
+  - package-ecosystem: pip
+    directory: /functions/stock_buyer
+    schedule:
+      interval: daily
+
+  - package-ecosystem: pip
+    directory: /functions/stock_checker
+    schedule:
+      interval: daily
+
+  - package-ecosystem: pip
+    directory: /functions/stock_seller
+    schedule:
+      interval: daily
+
+  - package-ecosystem: pip
+    directory: /tests
+    schedule:
+      interval: daily
