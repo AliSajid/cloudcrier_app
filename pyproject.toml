@@ -5,11 +5,6 @@ description = "An application to periodically access the weather APIs and get th
 authors = ["Ali Sajid Imami <395482+AliSajid@users.noreply.github.com>"]
 license = "MIT"
 readme = "README.md"
-packages = [
-  { include = "check_nws_api", from = "cloudcrier-app", to = "check_nws_api" },
-  { include = "check_openweather_api", from = "cloudcrier-app", to = "check_openweather_api" },
-  { include = "queue_actions", from = "cloudcrier-app", to = "queue_actions" },
-]
 
 [tool.poetry.dependencies]
 python = "^3.12"
