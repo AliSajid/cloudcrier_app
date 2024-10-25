@@ -185,6 +185,22 @@ botocore = ">=1.11.3"
 wrapt = "*"
 
 [[package]]
+name = "awscli-local"
+version = "0.22.0"
+description = "Thin wrapper around the \"aws\" command line interface for use with LocalStack"
+optional = false
+python-versions = "*"
+files = [
+    {file = "awscli-local-0.22.0.tar.gz", hash = "sha256:3807cf2ee4bbdd4df4dfc8bef027f25bde523dcaf8119720f677ed95ebba66a4"},
+]
+
+[package.dependencies]
+localstack-client = "*"
+
+[package.extras]
+ver1 = ["awscli"]
+
+[[package]]
 name = "binaryornot"
 version = "0.4.4"
 description = "Ultra-lightweight pure Python package to check if a file is binary or text."
@@ -1452,6 +1468,22 @@ files = [
 
 [package.dependencies]
 referencing = ">=0.31.0"
+
+[[package]]
+name = "localstack-client"
+version = "2.7"
+description = "A lightweight Python client for LocalStack."
+optional = false
+python-versions = "*"
+files = [
+    {file = "localstack_client-2.7.tar.gz", hash = "sha256:14993119901a4bcbef7c32d899b24f4a58a875a6765693edf1064d66b8a68408"},
+]
+
+[package.dependencies]
+boto3 = "*"
+
+[package.extras]
+test = ["black", "coverage", "flake8", "isort", "localstack", "pytest"]
 
 [[package]]
 name = "markdown-it-py"
@@ -2923,4 +2955,4 @@ files = [
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.12"
-content-hash = "a900bc8148ff58c5c46488c0cf9ec9dcf48385d10f32122cfbb5f63ed40b9066"
+content-hash = "0e3517e37c470f6e1ddfcb4aff78f3b692321331f59cc62489879f03701e2b35"

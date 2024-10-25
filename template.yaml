@@ -4,9 +4,8 @@ Transform: AWS::Serverless-2016-10-31
 Description: >
   cloudcrier-app
 
-  An application to periodically access the weather
-  APIs and get the prediction and
-  current weather data.
+  An application to periodically access the weather APIs
+  and get the prediction and current weather data.
 
 Globals:
   Function:
@@ -22,52 +21,29 @@ Globals:
       LogGroup: /aws/applications/cloudcrier_app
   Api:
     TracingEnabled: true
-Resources:
-  CloudCrierStateMachine:
-    Type: AWS::Serverless::StateMachine
-    Properties:
-      DefinitionUri: statemachine/cloudcrier.asl.json
-      DefinitionSubstitutions:
-        QueuingFunction: !GetAtt QueuingFunction.Arn
-        NWSApiFunction: !GetAtt NWSApiFunction.Arn
-        OpenWeatherApiFunction: !GetAtt OpenWeatherApiFunction.Arn
-        DDBPutItem: !Sub arn:${AWS::Partition}:states:::dynamodb:putItem
-        DDBTable: !Ref WeatherDataTable
-      Events:
-        HourlyWeatherCheckSchedule:
-          Type: Schedule
-          Properties:
-            Description: Schedule to run the weather check every hour
-            Enabled: false
-            Schedule: rate(1 hour)
-      Tags:
-        Name: CloudCrierStateMachine
-        Environment: Production
-        Application: CloudCrier
-        Management: AWS SAM
-        Managed: "true"
-      Policies:
-        - LambdaInvokePolicy:
-            FunctionName: !Ref QueuingFunction
-        - LambdaInvokePolicy:
-            FunctionName: !Ref NWSApiFunction
-        - LambdaInvokePolicy:
-            FunctionName: !Ref OpenWeatherApiFunction
-        - DynamoDBWritePolicy:
-            TableName: !Ref WeatherDataTable
-        - SQSSendMessagePolicy:
-            QueueName: !Ref WeatherQueue
-        - SQSPollerPolicy:
-            QueueName: !Ref WeatherQueue
 
-  WeatherQueue:
+Resources:
+  ## EventBridge rule to schedule the weather check every hour
+  HourlyWeatherCheckRule:
+    Type: AWS::Events::Rule
+    Properties:
+      ScheduleExpression: rate(1 hour)
+      State: ENABLED
+      Targets:
+        - Arn: !GetAtt QueuingFunction.Arn
+          Id: QueuingFunction
+
+  ## SQS Queue to manage weather data requests
+  WeatherQueueNWS:
     Type: AWS::SQS::Queue
     Properties:
-      QueueName: weather-queue.fifo
+      QueueName: weather-queue-nws.fifo
       FifoQueue: true
       Tags:
         - Key: Name
-          Value: WeatherQueue
+          Value: WeatherQueueNWS
+        - Key: Service
+          Value: National Weather Service
         - Key: Environment
           Value: Production
         - Key: Application
@@ -77,24 +53,73 @@ Resources:
         - Key: Managed
           Value: "true"
 
+  WeatherQueueOW:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: weather-queue-ow.fifo
+      FifoQueue: true
+      Tags:
+        - Key: Name
+          Value: WeatherQueueOW
+        - Key: Service
+          Value: OpenWeather API
+        - Key: Environment
+          Value: Production
+        - Key: Application
+          Value: CloudCrier
+        - Key: Management
+          Value: AWS SAM
+        - Key: Managed
+          Value: "true"
+
+  ## Lambda function that adds cities and weather API tasks to the SQS queue
   QueuingFunction:
     Type: AWS::Serverless::Function
     Properties:
       CodeUri: cloudcrier-app/queue_actions/
       Environment:
         Variables:
-          QUEUE_NAME: !GetAtt WeatherQueue.QueueName
+          NWS_QUEUE_NAME: !GetAtt WeatherQueueNWS.QueueName
+          OW_QUEUE_NAME: !GetAtt WeatherQueueOW.QueueName
+      Events:
+        HourlyEvent:
+          Type: Schedule
+          Properties:
+            Schedule: rate(1 hour)
 
+  ## Lambda function to handle NWS API requests
   NWSApiFunction:
     Type: AWS::Serverless::Function
     Properties:
       CodeUri: cloudcrier-app/check_nws_api/
+      Environment:
+        Variables:
+          QUEUE_NAME: !GetAtt WeatherQueueNWS.QueueName
+      Events:
+        NWSQueueEvent:
+          Type: SQS
+          Properties:
+            Queue: !GetAtt WeatherQueueNWS.Arn
+            BatchSize: 5
+            Enabled: true
 
+  ## Lambda function to handle OpenWeather API requests
   OpenWeatherApiFunction:
     Type: AWS::Serverless::Function
     Properties:
       CodeUri: cloudcrier-app/check_openweather_api/
+      Environment:
+        Variables:
+          QUEUE_NAME: !GetAtt WeatherQueueOW.QueueName
+      Events:
+        OWQueueEvent:
+          Type: SQS
+          Properties:
+            Queue: !GetAtt WeatherQueueOW.Arn
+            BatchSize: 5
+            Enabled: true
 
+  ## DynamoDB table to store city input information
   CityInputTable:
     Type: AWS::Serverless::SimpleTable
     Properties:
@@ -105,6 +130,7 @@ Resources:
         ReadCapacityUnits: 1
         WriteCapacityUnits: 1
 
+  ## DynamoDB table to store the weather data fetched from APIs
   WeatherDataTable:
     Type: AWS::DynamoDB::Table
     Properties:
@@ -119,6 +145,7 @@ Resources:
         ReadCapacityUnits: 1
         WriteCapacityUnits: 1
 
+  ## Application Insights and Monitoring
   ApplicationResourceGroup:
     Type: AWS::ResourceGroups::Group
     Properties:
@@ -133,9 +160,74 @@ Resources:
       AutoConfigurationEnabled: true
 
 Outputs:
-  WeatherQueue:
-    Description: "Weather Queue"
-    Value: !Ref WeatherQueue
+  WeatherQueueNWS:
+    Description: "NWS Weather Queue"
+    Value: !Ref WeatherQueueNWS
     Export:
-      Name: !Sub "${AWS::StackName}-WeatherQueue"
+      Name: !Sub "${AWS::StackName}-WeatherQueueNWS"
 
+  WeatherQueueOW:
+    Description: "OW Weather Queue"
+    Value: !Ref WeatherQueueOW
+    Export:
+      Name: !Sub "${AWS::StackName}-WeatherQueueOW"
+
+  QueuingFunctionArn:
+    Description: "The ARN of the Queuing Lambda Function"
+    Value: !GetAtt QueuingFunction.Arn
+    Export:
+      Name: !Sub "${AWS::StackName}-QueuingFunctionArn"
+
+  NWSApiFunctionArn:
+    Description: "The ARN of the NWS API Lambda Function"
+    Value: !GetAtt NWSApiFunction.Arn
+    Export:
+      Name: !Sub "${AWS::StackName}-NWSApiFunctionArn"
+
+  OpenWeatherApiFunctionArn:
+    Description: "The ARN of the OpenWeather API Lambda Function"
+    Value: !GetAtt OpenWeatherApiFunction.Arn
+    Export:
+      Name: !Sub "${AWS::StackName}-OpenWeatherApiFunctionArn"
+
+  QueuingFunctionLogGroup:
+    Description: "The CloudWatch Log Group for the Queuing Lambda Function"
+    Value: !Sub "/aws/lambda/${QueuingFunction}"
+
+  NWSApiFunctionLogGroup:
+    Description: "The CloudWatch Log Group for the NWS API Lambda Function"
+    Value: !Sub "/aws/lambda/${NWSApiFunction}"
+
+  OpenWeatherApiFunctionLogGroup:
+    Description: "The CloudWatch Log Group for the OpenWeather API Lambda Function"
+    Value: !Sub "/aws/lambda/${OpenWeatherApiFunction}"
+
+  CityInputTableName:
+    Description: "The name of the DynamoDB City Input Table"
+    Value: !Ref CityInputTable
+    Export:
+      Name: !Sub "${AWS::StackName}-CityInputTableName"
+
+  WeatherDataTableName:
+    Description: "The name of the DynamoDB Weather Data Table"
+    Value: !Ref WeatherDataTable
+    Export:
+      Name: !Sub "${AWS::StackName}-WeatherDataTableName"
+
+  HourlyWeatherCheckRuleArn:
+    Description: "The ARN of the EventBridge rule that triggers the weather check every hour"
+    Value: !GetAtt HourlyWeatherCheckRule.Arn
+    Export:
+      Name: !Sub "${AWS::StackName}-HourlyWeatherCheckRuleArn"
+
+  ApplicationInsightsArn:
+    Description: "The ARN of the Application Insights resource"
+    Value: !GetAtt ApplicationInsightsMonitoring.ApplicationARN
+    Export:
+      Name: !Sub "${AWS::StackName}-ApplicationInsightsArn"
+
+  ApplicationResourceGroupName:
+    Description: "The name of the Resource Group for Application Insights"
+    Value: !Ref ApplicationResourceGroup
+    Export:
+      Name: !Sub "${AWS::StackName}-ApplicationResourceGroupName"
