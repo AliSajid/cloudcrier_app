@@ -1,11 +1,12 @@
 [tool.poetry]
 name = "queue_cities"
 version = "0.1.0"
+description = "The serverless function that queues cities for weather checks"
 
 authors = ["Ali Sajid Imami <395482+AliSajid@users.noreply.github.com>"]
-license = ""
+license = "MIT"
 
-packages = []
+packages = [{ include = "cloudcrier-app/queue_cities", from = "../../bases" }]
 
 [tool.poetry.dependencies]
 python = "^3.12"

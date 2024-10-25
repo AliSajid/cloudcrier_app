@@ -1,6 +1,8 @@
 import os
 
 import boto3
+from aws_lambda_powertools.utilities.data_classes import SQSEvent, event_source
+from aws_lambda_powertools.utilities.typing import LambdaContext
 
 
 def lambda_handler(event, context):

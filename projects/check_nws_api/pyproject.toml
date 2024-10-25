@@ -1,11 +1,12 @@
 [tool.poetry]
 name = "check_nws_api"
 version = "0.1.0"
+description = "The serverless function that checkes the National Weather Service API"
 
 authors = ["Ali Sajid Imami <395482+AliSajid@users.noreply.github.com>"]
-license = ""
+license = "MIT"
 
-packages = []
+packages = [{ include = "cloudcrier-app/check_nws_api", from = "../../bases" }]
 
 [tool.poetry.dependencies]
 python = "^3.12"

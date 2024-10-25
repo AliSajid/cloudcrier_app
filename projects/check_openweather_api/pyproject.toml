@@ -1,11 +1,14 @@
 [tool.poetry]
 name = "check_openweather_api"
 version = "0.1.0"
+description = "The serverless function that checkes the OpenWeather API"
 
 authors = ["Ali Sajid Imami <395482+AliSajid@users.noreply.github.com>"]
-license = ""
+license = "MIT"
 
-packages = []
+packages = [
+  { include = "cloudcrier-app/check_openweather_api", from = "../../bases" },
+]
 
 [tool.poetry.dependencies]
 python = "^3.12"

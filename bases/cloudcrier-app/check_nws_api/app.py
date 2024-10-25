@@ -7,8 +7,8 @@ from aws_lambda_powertools.utilities.typing import LambdaContext
 @event_source(data_class=SQSEvent)
 def lambda_handler(event: SQSEvent, context: LambdaContext):
     payload: dict = {
-        "FunctionName": "check_openweather_api",
-        "InvocationType": "LocalIncocation",
+        "FunctionName": "check_nws_api",
+        "InvocationType": "LocalInvocation",
     }
     response = requests.post("https://httpbin.org/post", json=payload)
     return response.json()
