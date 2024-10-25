@@ -5,6 +5,8 @@ description = "An application to periodically access the weather APIs and get th
 authors = ["Ali Sajid Imami <395482+AliSajid@users.noreply.github.com>"]
 license = "MIT"
 readme = "README.md"
+homepage = "https://github.com/AliSajid/cloudcrier-app"
+repository = "https://github.com/AliSajid/cloudcrier-app"
 packages = [
   { include = "cloudcrier-app/check_nws_api", from = "bases" },
   { include = "cloudcrier-app/check_openweather_api", from = "bases" },

@@ -1,13 +1,15 @@
 [tool.poetry]
-name = "check_openweather_api"
+name = "cloudcrier-lambda-project"
 version = "0.1.0"
-description = "The serverless function that checkes the OpenWeather API"
+description = "An application to periodically access the weather APIs and get the prediction and current weather data."
 
 authors = ["Ali Sajid Imami <395482+AliSajid@users.noreply.github.com>"]
 license = "MIT"
 
 packages = [
+  { include = "cloudcrier-app/check_nws_api", from = "../../bases" },
   { include = "cloudcrier-app/check_openweather_api", from = "../../bases" },
+  { include = "cloudcrier-app/queue_cities", from = "../../bases" },
 ]
 
 [tool.poetry.dependencies]
