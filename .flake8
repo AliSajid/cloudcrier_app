@@ -17,6 +17,17 @@ exclude =
     .git,
     # There's no value in checking cache directories
     __pycache__
+    # No need to check the GitHub directory
+    .github
+    # No need to check the venv directory
+    venv
+    .venv
+    # Don't check the development directory
+    ./development/*.py
+    # Don't check the mypy cache
+    .mypy_cache
+    # Don't check the distribution directory
+    dist
 
 # Limit on the calculated McCabe complexity of a unit of code
 max-complexity = 10

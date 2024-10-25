@@ -5,6 +5,11 @@ description = "An application to periodically access the weather APIs and get th
 authors = ["Ali Sajid Imami <395482+AliSajid@users.noreply.github.com>"]
 license = "MIT"
 readme = "README.md"
+packages = [
+  { include = "cloudcrier-app/check_nws_api", from = "bases" },
+  { include = "cloudcrier-app/check_openweather_api", from = "bases" },
+  { include = "cloudcrier-app/queue_cities", from = "bases" },
+]
 
 [tool.poetry.dependencies]
 python = "^3.12"
@@ -64,17 +69,16 @@ addopts = """
   --junitxml=report.xml
   --cov-report term-missing:skip-covered
   --cov-report xml 
-  --cov src
 """
 
 ##### coverage configuration: https://coverage.readthedocs.io/en/latest/config.html
 [tool.coverage]
 [tool.coverage.paths]
-source = ["src"]
+source = ["bases", "components"]
 
 [tool.coverage.run]
 branch = true
-source = ["src"]
+source = ["bases", "components"]
 omit = ["tests/*"]
 
 [tool.coverage.report]
