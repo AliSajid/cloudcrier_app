@@ -1,0 +1,20 @@
+[tool.poetry]
+name = "cloudcrier-lambda-project"
+version = "0.1.0"
+description = "An application to periodically access the weather APIs and get the prediction and current weather data."
+
+authors = ["Ali Sajid Imami <395482+AliSajid@users.noreply.github.com>"]
+license = "MIT"
+
+packages = [
+  { include = "cloudcrier-app/check_nws_api", from = "../../bases" },
+  { include = "cloudcrier-app/check_openweather_api", from = "../../bases" },
+  { include = "cloudcrier-app/queue_cities", from = "../../bases" },
+]
+
+[tool.poetry.dependencies]
+python = "^3.12"
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"

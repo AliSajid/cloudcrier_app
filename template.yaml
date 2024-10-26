@@ -1,66 +1,127 @@
+---
 AWSTemplateFormatVersion: '2010-09-09'
 Transform: AWS::Serverless-2016-10-31
 Description: >
   cloudcrier-app
 
-  Sample SAM Template for cloudcrier-app
+  An application to periodically access the weather APIs
+  and get the prediction and current weather data.
+
+Globals:
+  Function:
+    Tracing: Active
+    Runtime: python3.12
+    Handler: app.lambda_handler
+    Timeout: 60
+    MemorySize: 128
+    Architectures:
+      - arm64
+    LoggingConfig:
+      LogFormat: JSON
+      LogGroup: /aws/applications/cloudcrier_app
+  Api:
+    TracingEnabled: true
+
 Resources:
-  StockTradingStateMachine:
-    Type: AWS::Serverless::StateMachine # More info about State Machine Resource: https://docs.aws.amazon.com/serverless-application-model/latest/developerguide/sam-resource-statemachine.html
+  ## EventBridge rule to schedule the weather check every hour
+  HourlyWeatherCheckRule:
+    Type: AWS::Events::Rule
     Properties:
-      DefinitionUri: statemachine/stock_trader.asl.json
-      DefinitionSubstitutions:
-        StockCheckerFunctionArn: !GetAtt StockCheckerFunction.Arn
-        StockSellerFunctionArn: !GetAtt StockSellerFunction.Arn
-        StockBuyerFunctionArn: !GetAtt StockBuyerFunction.Arn
-        DDBPutItem: !Sub arn:${AWS::Partition}:states:::dynamodb:putItem
-        DDBTable: !Ref TransactionTable
+      ScheduleExpression: rate(1 hour)
+      State: ENABLED
+      Targets:
+        - Arn: !GetAtt QueuingFunction.Arn
+          Id: QueuingFunction
+
+  ## SQS Queue to manage weather data requests
+  WeatherQueueNWS:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: weather-queue-nws.fifo
+      FifoQueue: true
+      Tags:
+        - Key: Name
+          Value: WeatherQueueNWS
+        - Key: Service
+          Value: National Weather Service
+        - Key: Environment
+          Value: Production
+        - Key: Application
+          Value: CloudCrier
+        - Key: Management
+          Value: AWS SAM
+        - Key: Managed
+          Value: "true"
+
+  WeatherQueueOW:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: weather-queue-ow.fifo
+      FifoQueue: true
+      Tags:
+        - Key: Name
+          Value: WeatherQueueOW
+        - Key: Service
+          Value: OpenWeather API
+        - Key: Environment
+          Value: Production
+        - Key: Application
+          Value: CloudCrier
+        - Key: Management
+          Value: AWS SAM
+        - Key: Managed
+          Value: "true"
+
+  ## Lambda function that adds cities and weather API tasks to the SQS queue
+  QueuingFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: cloudcrier-app/queue_actions/
+      Environment:
+        Variables:
+          NWS_QUEUE_NAME: !GetAtt WeatherQueueNWS.QueueName
+          OW_QUEUE_NAME: !GetAtt WeatherQueueOW.QueueName
       Events:
-        HourlyTradingSchedule:
-          Type: Schedule # More info about Schedule Event Source: https://docs.aws.amazon.com/serverless-application-model/latest/developerguide/sam-property-statemachine-schedule.html
+        HourlyEvent:
+          Type: Schedule
           Properties:
-            Description: Schedule to run the stock trading state machine every hour
-            Enabled: false # This schedule is disabled by default to avoid incurring charges.
             Schedule: rate(1 hour)
-      Policies: # Find out more about SAM policy templates: https://docs.aws.amazon.com/serverless-application-model/latest/developerguide/serverless-policy-templates.html
-      - LambdaInvokePolicy:
-          FunctionName: !Ref StockCheckerFunction
-      - LambdaInvokePolicy:
-          FunctionName: !Ref StockSellerFunction
-      - LambdaInvokePolicy:
-          FunctionName: !Ref StockBuyerFunction
-      - DynamoDBWritePolicy:
-          TableName: !Ref TransactionTable
 
-  StockCheckerFunction:
-    Type: AWS::Serverless::Function # More info about Function Resource: https://docs.aws.amazon.com/serverless-application-model/latest/developerguide/sam-resource-function.html
-    Properties:
-      CodeUri: functions/stock_checker/
-      Handler: app.lambda_handler
-      Runtime: python3.12
-      Architectures:
-      - x86_64
-
-  StockSellerFunction:
+  ## Lambda function to handle NWS API requests
+  NWSApiFunction:
     Type: AWS::Serverless::Function
     Properties:
-      CodeUri: functions/stock_seller/
-      Handler: app.lambda_handler
-      Runtime: python3.12
-      Architectures:
-      - x86_64
+      CodeUri: cloudcrier-app/check_nws_api/
+      Environment:
+        Variables:
+          QUEUE_NAME: !GetAtt WeatherQueueNWS.QueueName
+      Events:
+        NWSQueueEvent:
+          Type: SQS
+          Properties:
+            Queue: !GetAtt WeatherQueueNWS.Arn
+            BatchSize: 5
+            Enabled: true
 
-  StockBuyerFunction:
+  ## Lambda function to handle OpenWeather API requests
+  OpenWeatherApiFunction:
     Type: AWS::Serverless::Function
     Properties:
-      CodeUri: functions/stock_buyer/
-      Handler: app.lambda_handler
-      Runtime: python3.12
-      Architectures:
-      - x86_64
+      CodeUri: cloudcrier-app/check_openweather_api/
+      Environment:
+        Variables:
+          QUEUE_NAME: !GetAtt WeatherQueueOW.QueueName
+      Events:
+        OWQueueEvent:
+          Type: SQS
+          Properties:
+            Queue: !GetAtt WeatherQueueOW.Arn
+            BatchSize: 5
+            Enabled: true
 
-  TransactionTable:
-    Type: AWS::Serverless::SimpleTable # More info about SimpleTable Resource: https://docs.aws.amazon.com/serverless-application-model/latest/developerguide/sam-resource-simpletable.html
+  ## DynamoDB table to store city input information
+  CityInputTable:
+    Type: AWS::Serverless::SimpleTable
     Properties:
       PrimaryKey:
         Name: Id
@@ -69,36 +130,104 @@ Resources:
         ReadCapacityUnits: 1
         WriteCapacityUnits: 1
 
+  ## DynamoDB table to store the weather data fetched from APIs
+  WeatherDataTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: weather-data
+      AttributeDefinitions:
+        - AttributeName: Id
+          AttributeType: S
+      KeySchema:
+        - AttributeName: Id
+          KeyType: HASH
+      ProvisionedThroughput:
+        ReadCapacityUnits: 1
+        WriteCapacityUnits: 1
+
+  ## Application Insights and Monitoring
   ApplicationResourceGroup:
     Type: AWS::ResourceGroups::Group
     Properties:
-      Name:
-        Fn::Sub: ApplicationInsights-SAM-${AWS::StackName}
+      Name: !Sub "ApplicationInsights-SAM-${AWS::StackName}"
       ResourceQuery:
         Type: CLOUDFORMATION_STACK_1_0
+
   ApplicationInsightsMonitoring:
     Type: AWS::ApplicationInsights::Application
     Properties:
-      ResourceGroupName:
-        Ref: ApplicationResourceGroup
-      AutoConfigurationEnabled: 'true'
+      ResourceGroupName: !Ref ApplicationResourceGroup
+      AutoConfigurationEnabled: true
+
 Outputs:
-  # StockTradingStateMachineHourlyTradingSchedule is an implicit Schedule event rule created out of Events key under Serverless::StateMachine
-  # Find out more about other implicit resources you can reference within SAM
-  # https://docs.aws.amazon.com/serverless-application-model/latest/developerguide/sam-specification-generated-resources.html
-  StockTradingStateMachineArn:
-    Description: Stock Trading State machine ARN
-    Value: !Ref StockTradingStateMachine
-  StockTradingStateMachineRoleArn:
-    Description: IAM Role created for Stock Trading State machine based on the specified
-      SAM Policy Templates
-    Value: !GetAtt StockTradingStateMachineRole.Arn
-# # More info about Globals: https://github.com/awslabs/serverless-application-model/blob/master/docs/globals.rst
-Globals:
-  Function:
-    Tracing: Active
-    # You can add LoggingConfig parameters such as the Logformat, Log Group, and SystemLogLevel or ApplicationLogLevel. Learn more here https://docs.aws.amazon.com/serverless-application-model/latest/developerguide/sam-resource-function.html#sam-function-loggingconfig.
-    LoggingConfig:
-      LogFormat: JSON
-  Api:
-    TracingEnabled: true
+  WeatherQueueNWS:
+    Description: "NWS Weather Queue"
+    Value: !Ref WeatherQueueNWS
+    Export:
+      Name: !Sub "${AWS::StackName}-WeatherQueueNWS"
+
+  WeatherQueueOW:
+    Description: "OW Weather Queue"
+    Value: !Ref WeatherQueueOW
+    Export:
+      Name: !Sub "${AWS::StackName}-WeatherQueueOW"
+
+  QueuingFunctionArn:
+    Description: "The ARN of the Queuing Lambda Function"
+    Value: !GetAtt QueuingFunction.Arn
+    Export:
+      Name: !Sub "${AWS::StackName}-QueuingFunctionArn"
+
+  NWSApiFunctionArn:
+    Description: "The ARN of the NWS API Lambda Function"
+    Value: !GetAtt NWSApiFunction.Arn
+    Export:
+      Name: !Sub "${AWS::StackName}-NWSApiFunctionArn"
+
+  OpenWeatherApiFunctionArn:
+    Description: "The ARN of the OpenWeather API Lambda Function"
+    Value: !GetAtt OpenWeatherApiFunction.Arn
+    Export:
+      Name: !Sub "${AWS::StackName}-OpenWeatherApiFunctionArn"
+
+  QueuingFunctionLogGroup:
+    Description: "The CloudWatch Log Group for the Queuing Lambda Function"
+    Value: !Sub "/aws/lambda/${QueuingFunction}"
+
+  NWSApiFunctionLogGroup:
+    Description: "The CloudWatch Log Group for the NWS API Lambda Function"
+    Value: !Sub "/aws/lambda/${NWSApiFunction}"
+
+  OpenWeatherApiFunctionLogGroup:
+    Description: "The CloudWatch Log Group for the OpenWeather API Lambda Function"
+    Value: !Sub "/aws/lambda/${OpenWeatherApiFunction}"
+
+  CityInputTableName:
+    Description: "The name of the DynamoDB City Input Table"
+    Value: !Ref CityInputTable
+    Export:
+      Name: !Sub "${AWS::StackName}-CityInputTableName"
+
+  WeatherDataTableName:
+    Description: "The name of the DynamoDB Weather Data Table"
+    Value: !Ref WeatherDataTable
+    Export:
+      Name: !Sub "${AWS::StackName}-WeatherDataTableName"
+
+  HourlyWeatherCheckRuleArn:
+    Description: "The ARN of the EventBridge rule that triggers the weather check every hour"
+    Value: !GetAtt HourlyWeatherCheckRule.Arn
+    Export:
+      Name: !Sub "${AWS::StackName}-HourlyWeatherCheckRuleArn"
+
+  ApplicationInsightsArn:
+    Description: "The ARN of the Application Insights resource"
+    Value: !GetAtt ApplicationInsightsMonitoring.ApplicationARN
+    Export:
+      Name: !Sub "${AWS::StackName}-ApplicationInsightsArn"
+
+  ApplicationResourceGroupName:
+    Description: "The name of the Resource Group for Application Insights"
+    Value: !Ref ApplicationResourceGroup
+    Export:
+      Name: !Sub "${AWS::StackName}-ApplicationResourceGroupName"

@@ -1,0 +1,88 @@
+[tool.poetry]
+name = "cloudcrier-app"
+version = "0.1.0"
+description = "An application to periodically access the weather APIs and get the prediction and current weather data."
+authors = ["Ali Sajid Imami <395482+AliSajid@users.noreply.github.com>"]
+license = "MIT"
+readme = "README.md"
+homepage = "https://github.com/AliSajid/cloudcrier-app"
+repository = "https://github.com/AliSajid/cloudcrier-app"
+packages = [
+  { include = "cloudcrier-app/check_nws_api", from = "bases" },
+  { include = "cloudcrier-app/check_openweather_api", from = "bases" },
+  { include = "cloudcrier-app/queue_cities", from = "bases" },
+]
+
+[tool.poetry.dependencies]
+python = "^3.12"
+requests = "^2.32.3"
+aws-lambda-powertools = { extras = ["tracer"], version = "^3.2.0" }
+
+[tool.poetry.group.dev.dependencies]
+boto3 = "^1.35.45"
+aws-sam-cli-local = "^1.70.0"
+coverage = { extras = ["toml"], version = "^7.6.4" }
+aws-sam-cli = "^1.126.0"
+black = "^24.10.0"
+flake8 = "^7.1.1"
+flake8-black = "^0.3.6"
+flake8-bugbear = "^24.8.19"
+flake8-docstrings = "^1.7.0"
+flake8-isort = "^6.1.1"
+flake8-unused-arguments = "^0.0.13"
+isort = "^5.13.2"
+pep8-naming = "^0.14.1"
+pytest = "^8.3.3"
+pytest-cov = "^5.0.0"
+pytest-mock = "^3.14.0"
+pylyzer = "^0.0.68"
+awscli-local = "^0.22.0"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+##### isort configuration https://pycqa.github.io/isort/docs/configuration/config_files.html
+[tool.isort]
+profile = "black"
+default_section = "THIRDPARTY"
+sections = "FUTURE,STDLIB,THIRDPARTY,FIRSTPARTY,LOCALFOLDER"
+skip = "__init__.py"
+
+##### black configuration https://black.readthedocs.io/en/stable/usage_and_configuration/the_basics.html#configuration-via-a-file
+[tool.black]
+line-length = 88
+
+
+##### pytest configuration: http://doc.pytest.org/en/latest/customize.html
+[tool.pytest.ini_options]
+minversion = "6.0"
+python_files = ["test_*.py"]
+norecursedirs = [".git", ".pytest_cache", ".aws-sam"]
+filterwarnings = [
+  "error::UserWarning",
+  "error::DeprecationWarning",
+  "error::PendingDeprecationWarning",
+]
+addopts = """
+  --color=yes
+  -p no:cacheprovider
+  --verbose 
+  --junitxml=report.xml
+  --cov-report term-missing:skip-covered
+  --cov-report xml 
+"""
+
+##### coverage configuration: https://coverage.readthedocs.io/en/latest/config.html
+[tool.coverage]
+[tool.coverage.paths]
+source = ["bases", "components"]
+
+[tool.coverage.run]
+branch = true
+source = ["bases", "components"]
+omit = ["tests/*"]
+
+[tool.coverage.report]
+show_missing = true
+fail_under = 100
